@@ -5,8 +5,7 @@
 */
 const fs = require("fs");
 const Eris = require("eris");
-const { waitForDebugger } = require("inspector");
-const json = require("json");
+const axios = require("axios");
 
 let token = fs.readFileSync("token.txt").toString();
 
