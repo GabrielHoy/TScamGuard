@@ -5,6 +5,8 @@
 */
 const fs = require("fs");
 const Eris = require("eris");
+const { waitForDebugger } = require("inspector");
+const json = require("json");
 
 let token = fs.readFileSync("token.txt").toString();
 
@@ -49,7 +51,7 @@ const hardPhraseBlacklist = {
     "Free discord nitro": "Likely Scam Message - \"Free Discord Nitro\"",
     "get free nitro": "Likely scam message"
 }
-
+//will do something with these soon™
 const domainExtensions = [
   ".com",
   ".ca",
@@ -60,6 +62,14 @@ const domainExtensions = [
   ".net"
 ]
 
+//self explanatory, returns a promise that resolves after a timeout for sleeping in node
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+//levenshtein Distance, used to determine the general "similarity" between two strings
 function Levenshtein(str1, str2) {
   let len1 = str1.length;
   let len2 = str2.length;
@@ -133,7 +143,7 @@ const IsInfringingMessage = (message) => {
           str = str.replace(/\.[^.]+$/, "");
           //Check levenshtein distance, ignore the domain extension since we dont really care and have verified its *not* discord
           if (Levenshtein(linkText, str) <= 3) {
-            return `Attempt at bypassing a scam domain[Levenshtein check failed - ${Levenshtein(linkText, str)} - ${reason}] - ${str}`;
+            return `Attempt at bypassing a scam domain[Levenshtein check failed - ${Levenshtein(linkText, str)} - ${reason}]`;
           } 
         }
       }
@@ -144,8 +154,12 @@ bot.on("messageCreate", (msg) => {
   if (msg.author.id == bot.user.id) return;
     let isInfringeReason = IsInfringingMessage(msg);
     if (isInfringeReason) {
-        bot.createMessage(msg.channel.id, `<@${msg.author.id}>\nYour message has been deleted for: \n${isInfringeReason}`);
         msg.delete();
+        bot.createMessage(msg.channel.id, `<@${msg.author.id}>\nYour message has been deleted for: \n${isInfringeReason}`).then(msg => {
+            setTimeout(() => {
+                msg.delete();
+            }, 10000);
+        });
     }
 })
 
