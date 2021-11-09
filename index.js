@@ -23,7 +23,6 @@ bot.on("error", (err) => {
 let urlAwfulRegex = /((?:(?:https?|ftp):\/\/)?(?:(?!(?:10|127)(?:\.\d{1,3}){3})(?!(?:169\.254|192\.168)(?:\.\d{1,3}){2})(?!172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}(?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))|(?:(?:[a-z\u00a1-\uffff0-9]-*)*[a-z\u00a1-\uffff0-9]+)(?:\.(?:[a-z\u00a1-\uffff0-9]-*)*[a-z\u00a1-\uffff0-9]+)*(?:\.(?:[a-z\u00a1-\uffff]{2,})))(?::\d{2,5})?(?:\/\S*)?)/gi;
 
 const hardDomainBlacklist = {
-	 // "bit.ly": "Link Redirection platform",
 		"discrod-apps.xyz": "Discord scam site",
 		"discocrd-gift.com": "Discord scam site",
 		"dliscordl.com": "Discord scam site",
@@ -117,6 +116,7 @@ const IsInfringingLink = async (link) => {
 	if (strippedLink.toLowerCase() == "discord" || strippedLink.toLowerCase() == "discordapp") {
 		return false;
 	}
+	//is this link quite literally just discord
 	if (Levenshtein(strippedLink, "discord") <= 3) {
 		return `Attempt at bypassing the discord.com domain [Levenshtein check failed - ${Levenshtein(strippedLink, "discord")}]`;
 	}
