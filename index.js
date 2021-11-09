@@ -7,7 +7,7 @@ const fs = require("fs");
 const Eris = require("eris");
 const axios = require("axios");
 
-let token = fs.readFileSync("token.txt").toString();
+let token = fs.readFileSync("token.txt").toString().trim();
 
 const bot = new Eris(token);
 
