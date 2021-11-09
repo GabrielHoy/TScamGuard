@@ -40,7 +40,8 @@ const hardDomainBlacklist = {
 		"discordappp.com": "Discord scam site",
 		"discordap.com": "Discord scam site",
 		"boostnitro.com": "Discord scam site",
-		"discordboost.com": "Discord scam site"
+		"discordboost.com": "Discord scam site",
+		"discord-nittro.xyz": "Discord scam site"
 }
 
 const hardPhraseBlacklist = {
@@ -51,18 +52,16 @@ const hardPhraseBlacklist = {
 		"Discord Nitro with Steam": "Nitro Scam",
 		"Free distribution of": "Scam text",
 		"Free discord nitro": "Likely Scam Message - \"Free Discord Nitro\"",
-		"get free nitro": "Likely scam message"
+		"get free nitro": "Likely scam message",
+		"airdrop from steam": "Steam-Discord AirDrop Scam"
 }
-//will do something with these soon™
-const domainExtensions = [
-	".com",
-	".ca",
-	".dev",
-	".xyz",
-	".ly",
-	".me",
-	".net"
-]
+
+//has to be decently specific or uncommon, spans sites code for it
+const blacklistedSiteContent = {
+	"Get 3 months of Discord Nitro free from STEAM.": "Steam-Discord Scam",
+	"pososi_mudila.webm": "Steam-Discord scam",
+	"3 months of Discord Nitro free": "Discord Nitro Scam",
+}
 
 //self explanatory, returns a promise that resolves after a timeout for sleeping in node
 function sleep(ms) {
@@ -113,70 +112,91 @@ const StripLink = (link, keepTopLevelDomain) => {
 	return link.replace("https://","").replace("http://","").replace("www.","").replace(keepTopLevelDomain ? "" : /\.[^.]+$/, "");
 }
 
-const IsInfringingMessage = async (message) => {
-	//Hard checks(Can go out of date)
-		for (let [str,reason] of Object.entries(hardPhraseBlacklist)) {
-			if (message.content.toLowerCase().includes(str.toLowerCase())) {
-				return `Blacklisted phrase - ${reason}`;
-			}
+const IsInfringingLink = async (link) => {
+	let strippedLink = StripLink(link);
+	if (strippedLink.toLowerCase() == "discord" || strippedLink.toLowerCase() == "discordapp") {
+		return false;
+	}
+	if (Levenshtein(strippedLink, "discord") <= 3) {
+		return `Attempt at bypassing the discord.com domain [Levenshtein check failed - ${Levenshtein(strippedLink, "discord")}]`;
+	}
+	for (let [str,reason] of Object.entries(hardDomainBlacklist)) {
+		//strip url of domain extension
+		str = StripLink(str);
+		//Check levenshtein distance, ignore the domain extension since we dont really care and have verified its *not* discord
+		if (Levenshtein(strippedLink, str) <= 3) {
+			return `Attempt at bypassing a scam domain[Levenshtein check failed - ${Levenshtein(strippedLink, str)} - ${reason}]`;
 		}
-		for (let [str,reason] of Object.entries(hardDomainBlacklist)) {
-			if (message.content.toLowerCase().includes("https://" + str.toLowerCase() || "http://" + str.toLowerCase())) {
-				return `Blacklisted domain - ${reason}`;
+	}
+	try {
+		//Start the actual website content check
+		console.log("getting link", link);
+		let response = await axios.get(link);
+
+		for (let [str,reason] of Object.entries(blacklistedSiteContent)) {
+			if (response.data.toLowerCase().includes(str.toLowerCase())) {
+				return `Attempt at posting an unsafe site[${reason}]`;
 			}
 		}
 
-		//Soft checks(Should stay generally up-to-speed with scams as they progress)
-		//Gets a list of all the links in the message, iterates through them
-		for (let linkText of (message.content.toLowerCase().match(urlAwfulRegex) || [])) {
-			let originalLink = linkText;
-			//Strip url of http for use later
-			linkText = StripLink(linkText);
-			//first check if this is *literally* just discord
-			if (linkText.toLowerCase() == "discord" || linkText.toLowerCase() == "discordapp") {
-				continue;
+		if (response.request._redirectable._redirectCount > 0) {
+			
+			let infringeStatus = await IsInfringingLink(response.request.res.responseUrl);
+			if (infringeStatus) {
+				return `Attempt at redirection to an unsafe domain - Redirect details:\n${infringeStatus}`;
 			}
-			//Check levenshtein distance from linkText to discord domains and scam domains
-			if (Levenshtein(linkText, "discord") <= 3) {
-				return `Attempt at bypassing the discord.com domain [Levenshtein check failed - ${Levenshtein(linkText, "discord")}]`;
-			}
-			for (let [str,reason] of Object.entries(hardDomainBlacklist)) {
-				//strip url of domain extension
-				str = StripLink(str);
-				//Check levenshtein distance, ignore the domain extension since we dont really care and have verified its *not* discord
-				if (Levenshtein(linkText, str) <= 3) {
-					return `Attempt at bypassing a scam domain[Levenshtein check failed - ${Levenshtein(linkText, str)} - ${reason}]`;
-				}
-			}
-			try {
-				//Start the actual website content check
-				let response = await axios.get(originalLink);
-				//console.log(response.data);
-				console.log(response);
-				console.log("Host:",);
-				let responseUrlStripped = StripLink(response.request.res.responseUrl);
-				console.log("Response URL: ", responseUrlStripped);
-				console.log(responseUrlStripped.trim() == StripLink(response.request.host).trim());
-				if (responseUrlStripped.trim() == StripLink(response.request.host).trim()) {
-					return `Redirect - test - orig: ${originalLink} - redirect - ${response.request.res.responseUrl}`
-				}
-			} catch (err) {
-				console.warn(err);
-			}
+			//return `Redirect - test - orig: ${link} - redirect - ${response.request.res.responseUrl} - countRedirects = ${response.request._redirectable._redirectCount}`
 		}
+	} catch (err) {
+		console.warn(err);
+	}
+	return false;
+}
+
+const IsInfringingMessage = async (message) => {
+	//Hard checks(Can go out of date)
+	for (let [str,reason] of Object.entries(hardPhraseBlacklist)) {
+		if (message.content.toLowerCase().includes(str.toLowerCase())) {
+			return `Blacklisted phrase - ${reason}`;
+		}
+	}
+
+	for (let [str,reason] of Object.entries(hardDomainBlacklist)) {
+		if (message.content.toLowerCase().includes("https://" + str.toLowerCase() || "http://" + str.toLowerCase())) {
+			return `Blacklisted domain - ${reason}`;
+		}
+	}
+
+	//Match checks
+	if (message.content.toLowerCase().includes("@everyone") && (message.content.toLowerCase().includes("nitro") || message.content.toLowerCase().includes("3 months") || message.content.toLowerCase().includes("steam"))) {
+		return "Attempt to ping all server members for a scam";
+	}
+
+	//Soft checks(Should stay generally up-to-speed with scams as they progress)
+	//Gets a list of all the links in the message, iterates through them
+	for (let linkText of (message.content.match(urlAwfulRegex) || [])) {
+		let isInfringe = await IsInfringingLink(linkText);
+		if (isInfringe) {
+			return isInfringe;
+		}
+	}
 	return false;
 };
 
 bot.on("messageCreate", async (msg) => {
 	if (msg.author.id == bot.user.id) return;
-		let isInfringeReason = await IsInfringingMessage(msg);
-		if (isInfringeReason) {
+		try {
+			let isInfringeReason = await IsInfringingMessage(msg);
+			if (isInfringeReason) {
 				msg.delete();
 				bot.createMessage(msg.channel.id, `<@${msg.author.id}>\nYour message has been deleted for: \n${isInfringeReason}`).then(msg => {
-						setTimeout(() => {
-								msg.delete();
-						}, 10000);
+					setTimeout(() => {
+						msg.delete();
+					}, 10000);
 				});
+			}
+		} catch (err) {
+			console.log(err);
 		}
 })
 
